@@ -13,7 +13,7 @@ DISPLAY_WIDTH  :: 64
 DISPLAY_HEIGHT :: 32
 DISPLAY_SIZE   :: DISPLAY_WIDTH * DISPLAY_HEIGHT
 OFF_COLOR    :: rl.Color{0x2e, 0x30, 0x37, 0xFF} // #2e3037 Obra Dinn - IBM 8503 Palette
-ON_COLOR :: rl.Color{0xeb, 0xe5, 0xce, 0xFF} // #ebe5ce by PureAsbestos on https://lospec.com
+ON_COLOR :: rl.Color{0xeb, 0xe5, 0xce, 0xFF} // #ebe5ce by PureAsbestos
 
 WINDOW_WIDTH   :: 640
 WINDOW_HEIGHT  :: 320
@@ -64,6 +64,8 @@ KEY_MAPPING := [16]rl.KeyboardKey{
 	0xF = .V,
 }
 
+BEEP_WAV_BYTES :: #load("beep.wav")
+
 CHIP_8 :: struct
 {
   memory : [MEMORY_SIZE]u8,
@@ -88,7 +90,11 @@ tick_timers :: proc(chip_8: ^CHIP_8)
     decrement_timer(&chip_8.sound_timer)
 }
 
-beep :: proc(sound_timer: u8) {if sound_timer > 0 {}}
+beep :: proc(sound_timer: u8, sound: rl.Sound) 
+{
+    if sound_timer > 0 && !rl.IsSoundPlaying(sound) {rl.PlaySound(sound)} 
+    else if sound_timer == 0 && rl.IsSoundPlaying(sound) {rl.StopSound(sound)}
+}
 
 delay :: proc(delay_timer: u8) {if delay_timer > 0 {}}
 
@@ -396,6 +402,15 @@ main :: proc()
   rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "CHIP-8 Emulator")
   rl.SetTargetFPS(60)
 
+  rl.InitAudioDevice()
+  defer rl.CloseAudioDevice()
+
+  wave := rl.LoadWaveFromMemory(".wav", raw_data(BEEP_WAV_BYTES), i32(len(BEEP_WAV_BYTES)))
+  defer rl.UnloadWave(wave)
+
+  beep_sound := rl.LoadSoundFromWave(wave)
+  defer rl.UnloadSound(beep_sound)
+
   for !rl.WindowShouldClose() 
   {
     input_update(&chip_8)
@@ -407,6 +422,7 @@ main :: proc()
     }
 
     tick_timers(&chip_8)
+    beep(chip_8.sound_timer, beep_sound)
 
     window_w := f32(rl.GetScreenWidth())
     window_h := f32(rl.GetScreenHeight())
