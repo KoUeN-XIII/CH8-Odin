@@ -42,6 +42,28 @@ FONTSET := [80]u8{
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 }
 
+KEY_MAPPING := [16]rl.KeyboardKey{
+	0x1 = .ONE,
+	0x2 = .TWO,
+	0x3 = .THREE,
+	0xC = .FOUR,
+	
+	0x4 = .Q,
+	0x5 = .W,
+	0x6 = .E,
+	0xD = .R,
+	
+	0x7 = .A,
+	0x8 = .S,
+	0x9 = .D,
+	0xE = .F,
+	
+	0xA = .Z,
+	0x0 = .X,
+	0xB = .C,
+	0xF = .V,
+}
+
 CHIP_8 :: struct
 {
   memory : [MEMORY_SIZE]u8,
@@ -51,6 +73,7 @@ CHIP_8 :: struct
   sound_timer : u8,
   v_registers : [16]u8,
   display: [DISPLAY_SIZE]bool,
+  keys: [16]bool,
   stack: queue.Queue(u16),
 }
 
@@ -151,6 +174,10 @@ set_vx_vy :: proc(v_register: []u8, x: u8, y: u8, n: u8)
 set_i_register :: proc(i: ^u16, address: u16) {i^ = address}
 jump_with_offset :: proc(pc: ^u16, v_register: []u8, address: u16) {pc^ = address + u16(v_register[0x0])}
 
+
+is_pixel_on :: proc(display: []bool, x_coord: u8, y_coord: u8) -> bool {return display[(y_coord * DISPLAY_WIDTH) + x_coord] }
+set_pixel :: proc(display: []bool, x_coord: u8, y_coord: u8, is_on: bool ) {display[(y_coord * DISPLAY_WIDTH) + x_coord] = is_on}
+
 display :: proc(chip_8: ^CHIP_8, x: u8, y: u8, n: u8) 
 {
     vx := chip_8.v_registers[x]
@@ -189,12 +216,90 @@ display :: proc(chip_8: ^CHIP_8, x: u8, y: u8, n: u8)
     }
 }
 
-store_pressed_key :: proc() {}
+input_update :: proc(chip_8: ^CHIP_8)
+{
+	for i in 0..<16
+  {
+    kb_key := KEY_MAPPING[i]
+		chip_8.keys[i] = rl.IsKeyDown(kb_key)
+	}
+}
+
+skip_on_key :: proc(pc: ^u16, keys: []bool, v_registers: []u8, nn: u8, x: u8) 
+{
+	key_val := v_registers[x] & 0x0F
+	switch nn 
+  {
+	case 0x9E:
+		if keys[key_val] {pc^ += 2}
+	case 0xA1:
+		if !keys[key_val] {pc^ += 2}
+	}
+}
+
+store_pressed_key :: proc(pc: ^u16, keys: []bool, v_register: []u8, x: u8) 
+{
+	key_pressed := false
+	for i in 0..<16 
+  {
+		if keys[i] 
+    {
+			v_register[x] = u8(i)
+			key_pressed = true
+			break
+		}
+	}
+	if !key_pressed 
+  {
+		pc^ -= 2
+	}
+}
 
 set_vx_to_delay_timer :: proc(delay_timer: u8, v_register: []u8, x: u8) {v_register[x] = delay_timer}
 set_delay_timer_to_vx :: proc(delay_timer: ^u8, v_register: []u8, x: u8) {delay_timer^ = v_register[x]}
 set_sound_timer_to_vx :: proc(sound_timer: ^u8, v_register: []u8, x: u8) {sound_timer^ = v_register[x]}
-set_i_to_i_plus_vx :: proc(v_register: []u8, i: ^u8, x: u8) {i^ = i^ + v_register[x]}
+set_i_to_i_plus_vx :: proc(v_register: []u8, i: ^u16, x: u8) {i^ = i^ + u16(v_register[x])}
+store_bcd_of_vx_in_memory :: proc(memory: []u8, v_register: []u8, i: u16, x:u8) 
+{
+  memory[i] = v_register[x] / 100;
+  memory[i+1] = (v_register[x] % 100) / 10;
+  memory[i+2] = v_register[x] % 10;
+}
+
+store_v0_to_vx_in_memory :: proc(memory: []u8, v_register: []u8, i: u16, x: u8) 
+{
+	for j in 0..=x {memory[i + u16(j)] = v_register[j]}
+}
+
+read_v0_to_vx_from_memory :: proc(memory: []u8, v_register: []u8, i: u16, x: u8)
+{
+	for j in 0..=x {v_register[j] = memory[i + u16(j)]}
+}
+
+execute_f_instructions :: proc(chip_8: ^CHIP_8, x: u8, nn: u8)
+{
+	switch nn
+	{
+	case 0x07:
+		set_vx_to_delay_timer(chip_8.delay_timer, chip_8.v_registers[:], x)
+  case 0x0A:
+		store_pressed_key(&chip_8.pc, chip_8.keys[:], chip_8.v_registers[:], x)
+	case 0x15:
+		set_delay_timer_to_vx(&chip_8.delay_timer, chip_8.v_registers[:], x)
+	case 0x18:
+		set_sound_timer_to_vx(&chip_8.sound_timer, chip_8.v_registers[:], x)
+	case 0x1E:
+		set_i_to_i_plus_vx(chip_8.v_registers[:], &chip_8.i, x)
+	case 0x29:
+		chip_8.i = FONT_START_ADDR + u16(chip_8.v_registers[x]) * 5
+	case 0x33:
+		store_bcd_of_vx_in_memory(chip_8.memory[:], chip_8.v_registers[:], chip_8.i, x)
+	case 0x55:
+		store_v0_to_vx_in_memory(chip_8.memory[:], chip_8.v_registers[:], chip_8.i, x)
+	case 0x65:
+		read_v0_to_vx_from_memory(chip_8.memory[:], chip_8.v_registers[:], chip_8.i, x)
+	}
+}
 
 
 decode_and_execute :: proc(chip_8: ^CHIP_8, instruction: u16)
@@ -242,7 +347,9 @@ case 0x5, 0x9:
   case 0xD:
     display(chip_8, x, y, n)
   case 0xE:
+    skip_on_key(&chip_8.pc, chip_8.keys[:], chip_8.v_registers[:], nn, x)
   case 0xF:
+    execute_f_instructions(chip_8, x, nn)
   case : 
   }
 
@@ -261,6 +368,17 @@ load_rom :: proc(memory: []u8, filepath: string) -> bool
 
 main :: proc() 
 {
+  if len(os.args) < 2
+  {
+    fmt.println("Missing argument: Please provide the ROM path.")
+    return
+  }
+  else if len(os.args) > 2
+  {
+    fmt.println("Too many arguments: Only the ROM path should be provided.")
+    return
+  }
+    
   chip_8: CHIP_8
   queue.init(&chip_8.stack)
   copy(chip_8.memory[0x050:], FONTSET[:])
@@ -268,7 +386,7 @@ main :: proc()
 
   chip_8.pc = 0x200
 
-  if !load_rom(chip_8.memory[:], "ibm_logo.ch8")
+  if !load_rom(chip_8.memory[:], os.args[1])
   { 
     fmt.println("Failed to load ROM!")
     return
@@ -277,6 +395,7 @@ main :: proc()
   rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "raylib [core] example - basic window")
   for !rl.WindowShouldClose() 
   {
+    input_update(&chip_8)
     for _ in 0..<10
     {
     instruction := fetch(&chip_8)
