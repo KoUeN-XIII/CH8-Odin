@@ -393,14 +393,19 @@ main :: proc()
   }
 
   rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "raylib [core] example - basic window")
+  rl.SetTargetFPS(60)
+
   for !rl.WindowShouldClose() 
   {
     input_update(&chip_8)
+
     for _ in 0..<10
     {
     instruction := fetch(&chip_8)
     decode_and_execute(&chip_8, instruction)
     }
+
+    tick_timers(&chip_8)
 
     rl.BeginDrawing()
     rl.ClearBackground(rl.BLACK)
