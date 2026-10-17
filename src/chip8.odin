@@ -12,8 +12,8 @@ DISPLAY_UPDATE :: 60
 DISPLAY_WIDTH  :: 64
 DISPLAY_HEIGHT :: 32
 DISPLAY_SIZE   :: DISPLAY_WIDTH * DISPLAY_HEIGHT
-OFF_COLOR      :: 0xFFFF
-ON_COLOR       :: 0x0000
+OFF_COLOR    :: rl.Color{0x2e, 0x30, 0x37, 0xFF} // #2e3037 Obra Dinn - IBM 8503 Palette
+ON_COLOR :: rl.Color{0xeb, 0xe5, 0xce, 0xFF} // #ebe5ce by PureAsbestos on https://lospec.com
 
 WINDOW_WIDTH   :: 640
 WINDOW_HEIGHT  :: 320
@@ -392,7 +392,8 @@ main :: proc()
     return
   }
 
-  rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "raylib [core] example - basic window")
+  rl.SetConfigFlags({.WINDOW_RESIZABLE})
+  rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "CHIP-8 Emulator")
   rl.SetTargetFPS(60)
 
   for !rl.WindowShouldClose() 
@@ -407,16 +408,32 @@ main :: proc()
 
     tick_timers(&chip_8)
 
+    window_w := f32(rl.GetScreenWidth())
+    window_h := f32(rl.GetScreenHeight())
+
+    scale_x := int(window_w / DISPLAY_WIDTH)
+    scale_y := int(window_h / DISPLAY_HEIGHT)
+    scale := min(scale_x, scale_y)
+    if scale < 1 { scale = 1 }
+
+    offset_x := (int(window_w) - (DISPLAY_WIDTH * scale)) / 2
+    offset_y := (int(window_h) - (DISPLAY_HEIGHT * scale)) / 2
+
     rl.BeginDrawing()
-    rl.ClearBackground(rl.BLACK)
-    for y in 0..<DISPLAY_HEIGHT 
-    {
-    for x in 0..<DISPLAY_WIDTH 
-    {
-        index := (y * DISPLAY_WIDTH) + x
-        if chip_8.display[index] {rl.DrawRectangle(i32(x) * 10, i32(y) * 10, 10, 10, rl.WHITE)}
-    }
-  }
+    rl.ClearBackground(OFF_COLOR)
+   for y in 0..<DISPLAY_HEIGHT
+   {
+     for x in 0..<DISPLAY_WIDTH 
+     {
+       index := (y * DISPLAY_WIDTH) + x
+       if chip_8.display[index] 
+       {
+         rx := i32(offset_x + (x * scale))
+         ry := i32(offset_y + (y * scale))
+         rl.DrawRectangle(rx, ry, i32(scale), i32(scale), ON_COLOR)
+       }
+     }
+   }
   rl.EndDrawing()
   }
   rl.CloseWindow()
