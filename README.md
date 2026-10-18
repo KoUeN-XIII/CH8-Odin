@@ -19,7 +19,7 @@ The standard 16-key CHIP-8 keypad is mapped to a QWERTY keyboard layout as follo
 
 1. Clone the repository and navigate to the project directory:
    ```bash
-   git clone [https://github.com/KoUeN-XIII/CH8-Odin.git](https://github.com/KoUeN-XIII/CH8-Odin.git)
+   git clone https://github.com/KoUeN-XIII/CH8-Odin.git
    cd CH8-Odin
    odin build ./src -out:chip8
    ./chip8 roms/path/to/your/rom
