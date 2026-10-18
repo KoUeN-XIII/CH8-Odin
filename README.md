@@ -16,8 +16,6 @@ The standard 16-key CHIP-8 keypad is mapped to a QWERTY keyboard layout as follo
 
 
 ## Building and Running
-
-1. Clone the repository and navigate to the project directory:
    ```bash
    git clone https://github.com/KoUeN-XIII/CH8-Odin.git
    cd CH8-Odin
