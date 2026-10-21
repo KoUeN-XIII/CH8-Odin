@@ -180,10 +180,6 @@ set_vx_vy :: proc(v_register: []u8, x: u8, y: u8, n: u8)
 set_i_register :: proc(i: ^u16, address: u16) {i^ = address}
 jump_with_offset :: proc(pc: ^u16, v_register: []u8, address: u16) {pc^ = address + u16(v_register[0x0])}
 
-
-is_pixel_on :: proc(display: []bool, x_coord: u8, y_coord: u8) -> bool {return display[(y_coord * DISPLAY_WIDTH) + x_coord] }
-set_pixel :: proc(display: []bool, x_coord: u8, y_coord: u8, is_on: bool ) {display[(y_coord * DISPLAY_WIDTH) + x_coord] = is_on}
-
 display :: proc(chip_8: ^CHIP_8, x: u8, y: u8, n: u8) 
 {
     vx := chip_8.v_registers[x]
